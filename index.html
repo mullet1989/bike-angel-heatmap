@@ -1,0 +1,319 @@
+<!doctype html>
+<html class="no-js" lang="">
+
+<head>
+  <meta charset="utf-8">
+  <title>Bike Angels Heatmap</title>
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <meta property="og:title" content="citibike heatmap">
+  <meta property="og:type" content="website">
+  <!--  <meta property="og:url" content="">-->
+  <meta property="og:image" content="logo.png">
+
+  <link rel="manifest" href="site.webmanifest">
+  <!-- Place favicon.ico in the root directory -->
+
+  <link rel="stylesheet" href="css/normalize.css">
+  <link rel="stylesheet" href="css/main.css">
+
+  <meta name="theme-color" content="#fafafa">
+
+  <script src="https://api.tiles.mapbox.com/mapbox-gl-js/v2.4.0/mapbox-gl.js"></script>
+  <link
+    href="https://api.tiles.mapbox.com/mapbox-gl-js/v2.4.0/mapbox-gl.css"
+    rel="stylesheet"
+  />
+
+
+</head>
+
+<body>
+
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  #map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+  }
+</style>
+
+
+<div id="map">Loading...</div>
+
+<script>
+
+  fetch(
+    /*"/stations.json"*/
+    "https://layer.bicyclesharing.net/map/v1/nyc/stations"
+  ).then(function (x) {
+    return x.json()
+  }).then(function (data) {
+
+    mapboxgl.accessToken =
+      'pk.eyJ1IjoibXVsbGV0MTk4OSIsImEiOiJja3NmZHJ1M24xOW9oMm9udnVraHpndmd4In0.p1KuGixJ05EaODdx5HIBIA';
+    var map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/dark-v10',
+      center: [-73.98073, 40.76456],
+      zoom: 11
+    });
+
+
+    map.on('load', function () {
+
+      const give = data.features.filter(x =>
+        x.properties.bike_angels_action === "give"
+        && x.properties.bike_angels_points > 0)
+
+      const take = data.features.filter(x =>
+        x.properties.bike_angels_action !== "give"
+        && x.properties.bike_angels_points > 0)
+
+      const giveJson = {...data, features: give}
+      const takeJson = {...data, features: take}
+
+      map.addSource('stations_give', {
+        type: 'geojson',
+        data: giveJson
+      });
+
+      map.addSource('stations_take', {
+        type: 'geojson',
+        data: takeJson
+      });
+
+
+      map.addLayer({
+        id: 'stations-heat-give',
+        type: 'heatmap',
+        source: 'stations_give',
+        maxzoom: 15,
+        paint: {
+          // increase weight as diameter breast height increases
+          'heatmap-weight': {
+            property: 'bike_angels_points',
+            type: 'exponential',
+            stops: [
+              [1, 1],
+              [62, 0]
+            ]
+          },
+          // increase intensity as zoom level increases
+          'heatmap-intensity': {
+            stops: [
+              [11, 1],
+              [15, 4]
+            ]
+          },
+          // assign color values be applied to points depending on their density
+          'heatmap-color': [
+            'interpolate',
+            ['linear'],
+            ['heatmap-density'],
+            0, 'rgba(236,222,239,0)',
+            0.2, 'rgb(255,150,191)',
+            0.4, 'rgb(255,100,191)',
+            0.6, 'rgb(255,50,231)',
+            0.8, 'rgb(255,0,191)'
+          ],
+          // increase radius as zoom increases
+          'heatmap-radius': {
+            stops: [
+              [11, 15],
+              [15, 20]
+            ]
+          },
+          // decrease opacity to transition into the circle layer
+          'heatmap-opacity': {
+            default: 0,
+            stops: [
+              [14, 1],
+              [15, 0]
+            ]
+          },
+        }
+      });
+
+      map.addLayer({
+        id: 'stations-heat-take',
+        type: 'heatmap',
+        source: 'stations_take',
+        maxzoom: 15,
+        paint: {
+          // increase weight as diameter breast height increases
+          'heatmap-weight': {
+            property: 'bike_angels_points',
+            type: 'exponential',
+            stops: [
+              [1, 1],
+              [62, 0]
+            ]
+          },
+          // increase intensity as zoom level increases
+          'heatmap-intensity': {
+            stops: [
+              [11, 1],
+              [15, 4]
+            ]
+          },
+          // assign color values be applied to points depending on their density
+          'heatmap-color': [
+            'interpolate',
+            ['linear'],
+            ['heatmap-density'],
+            0, 'rgba(236,222,239,0)',
+            0.2, 'rgb(200,200,230)',
+            0.4, 'rgb(150,150,230)',
+            0.6, 'rgb(100,100,221)',
+            0.8, 'rgb(50,50,221)'
+          ],
+          // increase radius as zoom increases
+          'heatmap-radius': {
+            stops: [
+              [11, 15],
+              [15, 20]
+            ]
+          },
+          // decrease opacity to transition into the circle layer
+          'heatmap-opacity': {
+            default: 0,
+            stops: [
+              [14, 1],
+              [15, 0]
+            ]
+          },
+        }
+      });
+
+      map.addLayer({
+        id: 'stations-point-give',
+        type: 'circle',
+        source: 'stations_give',
+        minzoom: 14,
+        paint: {
+          // increase the radius of the circle as the zoom level and dbh value increases
+          'circle-radius': {
+            property: 'bike_angels_points',
+            type: 'exponential',
+            stops: [
+              [{zoom: 14, value: 1}, 5],
+              [{zoom: 14, value: 4}, 10],
+              [{zoom: 22, value: 1}, 20],
+              [{zoom: 22, value: 4}, 50],
+            ]
+          },
+          'circle-color': {
+            property: 'bike_angels_points',
+            type: 'exponential',
+            stops: [
+              [0, 'rgba(236,222,239,0)'],
+              [1, 'rgb(255,150,191)'],
+              [2, 'rgb(255,100,191)'],
+              [3, 'rgb(255,50,231)'],
+              [4, 'rgb(255,0,191)']
+            ]
+          },
+          'circle-stroke-color': 'white',
+          'circle-stroke-width': 1,
+          'circle-opacity': {
+            stops: [
+              [14, 0],
+              [15, 0.8],
+              [16, 1]
+            ]
+          }
+        }
+      });
+
+      map.addLayer({
+        id: 'stations-point-take',
+        type: 'circle',
+        source: 'stations_take',
+        minzoom: 14,
+        paint: {
+          // increase the radius of the circle as the zoom level and dbh value increases
+          'circle-radius': {
+            property: 'bike_angels_points',
+            type: 'exponential',
+            stops: [
+              [{zoom: 14, value: 1}, 5],
+              [{zoom: 14, value: 4}, 10],
+              [{zoom: 22, value: 1}, 20],
+              [{zoom: 22, value: 4}, 50],
+            ]
+          },
+          'circle-color': {
+            property: 'bike_angels_points',
+            type: 'exponential',
+            stops: [
+              [0, 'rgba(236,222,239,0)'],
+              [1, 'rgb(200,200,230)'],
+              [2, 'rgb(150,150,230)'],
+              [3, 'rgb(100,100,221)'],
+              [4, 'rgb(50,50,221)']
+            ]
+          },
+          'circle-stroke-color': 'white',
+          'circle-stroke-width': 1,
+          'circle-opacity': {
+            stops: [
+              [14, 0],
+              [15, 0.8],
+              [16, 1]
+            ]
+          }
+        }
+      });
+
+    });
+
+    let popup = new mapboxgl.Popup();
+    let hovering = false;
+    map.on('mousemove', 'stations-point-give', function (e) {
+      map.getCanvas().style.cursor = 'pointer'
+      hovering = true;
+      popup
+        .setLngLat(e.features[0].geometry.coordinates)
+        .setHTML('<b>Give Points Available:</b> ' + e.features[0].properties.bike_angels_points)
+        .addTo(map);
+    });
+
+    map.on("mouseleave", 'stations-point-give', function (e) {
+      map.getCanvas().style.cursor = ''
+      if (hovering) {
+        popup.remove()
+      }
+    })
+
+    map.on('mousemove', 'stations-point-take', function (e) {
+      map.getCanvas().style.cursor = 'pointer'
+      hovering = true;
+      popup
+        .setLngLat(e.features[0].geometry.coordinates)
+        .setHTML('<b>Take Points Available:</b> ' + e.features[0].properties.bike_angels_points)
+        .addTo(map);
+    });
+
+    map.on("mouseleave", 'stations-point-take', function (e) {
+      map.getCanvas().style.cursor = ''
+      if (hovering) {
+        popup.remove()
+      }
+    })
+
+  })
+
+</script>
+
+
+</body>
+
+</html>
